@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>股价异动分析系统</title>
+    <link rel="stylesheet" href="static/style.css?v=20250824-9">
+
+    <!-- V5.8: AI模式选择器样式 -->
+    <style>
+        .ai-mode-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .ai-mode-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #f9f9f9;
+        }
+
+        .ai-mode-group:hover {
+            background: #f0f0f0;
+        }
+
+        .ai-mode-group input[type="radio"] {
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        .ai-mode-group label {
+            font-weight: bold;
+            color: #333;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+
+        .ai-mode-desc {
+            font-size: 11px;
+            color: #666;
+            margin-left: 20px;
+            font-style: italic;
+        }
+
+        .ai-mode-group input[type="radio"]:checked + label {
+            color: #007bff;
+        }
+
+        .ai-mode-group input[type="radio"]:checked ~ .ai-mode-desc {
+            color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <!-- 通知容器 -->
+    <div id="notification" class="notification"></div>
+    
+    
+    <div class="container">
+        <div class="header-wrapper">
+            <button id="helpBtn" class="help-btn" title="使用说明">
+                ❓ 帮助
+            </button>
+            <h1>📈 股价异动分析系统</h1>
+            <button id="settingsToggleBtn" class="settings-toggle-btn" title="设置">
+                ⚙️ 设置
+            </button>
+        </div>
+        
+        <div class="controls">
+                            <input type="text" id="tickerInput" value="ONC" placeholder="股票代码 (A股: 600000, 美股: AAPL, 港股: 0700) 或公司简称">
+            <button id="fetchBtn">📊 获取数据</button>
+            <div class="period-controls">
+                <button id="dailyBtn" class="period-btn active">日K线</button>
+                <button id="weeklyBtn" class="period-btn">周K线</button>
+                <button id="monthlyBtn" class="period-btn">月K线</button>
+            </div>
+        </div>
+
+        
+        <div id="statusDiv" class="status">
+            请输入股票代码并点击"获取数据"开始分析
+        </div>
+        
+        <div class="chart-wrapper">
+            <div id="chart-container" tabindex="0"></div>
+            <div id="info-box-container"></div>
+        </div>
+
+        <div id="chart-legend" class="chart-legend-container"></div>
+
+
+        <!-- 注释管理面板 -->
+        <div class="annotation-list-panel">
+            <div class="list-header">
+                <div class="header-row">
+                    <div class="tab-container">
+                        <button id="annotationTab" class="tab-btn active">📝 注释管理</button>
+                        <button id="recycleTab" class="tab-btn">🗑️ 回收站</button>
+                    </div>
+
+                    <div class="header-actions">
+                        <button id="sortAnnotationBtn" class="sort-btn" title="切换时间排序方式">📅 ↓</button>
+                        <button id="exportAnnotationBtn" class="export-btn">📤 导出数据</button>
+                        <button id="addAnnotationBtn" class="add-btn">+ 新增注释</button>
+                    </div>
+                </div>
+
+                <!-- V5.8.4: 时间筛选控制器 -->
+                <div class="time-filter-section">
+                    <div class="time-filter-quick">
+                        <label for="timeRangeQuickSelect">📅 快速选择:</label>
+                        <select id="timeRangeQuickSelect" class="time-range-select">
+                            <option value="all">显示全部</option>
+                            <option value="1y">最近1年</option>
+                            <option value="3y">最近3年</option>
+                            <option value="5y">最近5年</option>
+                            <option value="10y" selected>最近10年</option>
+                            <option value="15y">最近15年</option>
+                            <option value="20y">最近20年</option>
+                            <option value="custom">自定义范围</option>
+                        </select>
+                    </div>
+
+                    <div class="time-filter-custom" id="timeFilterCustom" style="display: none;">
+                        <label for="startDateInput">开始日期:</label>
+                        <input type="date" id="startDateInput" class="date-input">
+                        <label for="endDateInput">结束日期:</label>
+                        <input type="date" id="endDateInput" class="date-input">
+                        <button id="applyCustomDateBtn" class="apply-date-btn">✓ 应用</button>
+                    </div>
+
+                    <div class="time-filter-info" id="timeFilterInfo">
+                        <span class="filter-status">📊 显示全部注释</span>
+                    </div>
+                </div>
+                <!-- V4.8.3: 批量操作控制区域 -->
+                <div class="batch-controls" id="batchControls" style="display: none;">
+                    <span class="selected-count" id="selectedCount">已选中 0 项</span>
+                    <button id="selectAllBtn" class="select-all-btn" title="全选/取消全选">📋 全选</button>
+                    <button id="batchAnalyzeBtn" class="batch-analyze-btn" disabled title="对选中的注释执行批量AI分析">
+                        🤖 批量分析
+                    </button>
+                    <button id="clearSelectionBtn" class="clear-selection-btn" title="取消所有选择">✖ 取消选择</button>
+                </div>
+            </div>
+            
+            <!-- 注释管理标签页 -->
+            <div class="tab-content active" id="annotationTabContent">
+                <div class="annotation-list" id="annotationList">
+                    <p style="text-align: center; color: #6c757d; font-style: italic;">暂无注释</p>
+                </div>
+            </div>
+            
+            <!-- 回收站标签页 -->
+            <div class="tab-content" id="recycleTabContent">
+                <div class="recycle-header">
+                    <p class="recycle-desc">已删除的注释会在此保留，可以选择恢复或永久删除</p>
+                    <button id="refreshRecycleBtn" class="refresh-btn">🔄 刷新</button>
+                </div>
+                <div class="annotation-list" id="recycleList">
+                    <p style="text-align: center; color: #6c757d; font-style: italic;">回收站为空</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧设置边栏 -->
+    <div id="settingsSidebar" class="settings-sidebar">
+        <div class="sidebar-content">
+            <div class="sidebar-header">
+                <h3>⚙️ 设置面板</h3>
+                <button id="sidebarCloseBtn" class="sidebar-close-btn">×</button>
+            </div>
+            
+            <div class="sidebar-section">
+                <h4>🔍 异常检测算法</h4>
+                <div class="algo-controls-sidebar">
+                    <div class="algo-group">
+                        <input type="checkbox" id="priceVolumeCheck" checked>
+                        <label for="priceVolumeCheck">价量齐升/跌 (价格倍数):</label>
+                        <input type="number" id="priceStdInput" value="1.8" step="0.1">
+                    </div>
+                    <div class="algo-group">
+                        <input type="checkbox" id="volumePriceCheck">
+                        <label for="volumePriceCheck">放量滞涨/跌 (成交量倍数):</label>
+                        <input type="number" id="volumeStdInput" value="1.8" step="0.1">
+                    </div>
+                    <div class="algo-group">
+                        <input type="checkbox" id="priceOnlyCheck">
+                        <label for="priceOnlyCheck">仅价格异常 (价格倍数):</label>
+                        <input type="number" id="priceOnlyStdInput" value="2.5" step="0.1">
+                    </div>
+                    <div class="algo-group">
+                        <input type="checkbox" id="volumeOnlyCheck">
+                        <label for="volumeOnlyCheck">仅成交量异常 (成交量倍数):</label>
+                        <input type="number" id="volumeOnlyStdInput" value="3.0" step="0.1">
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h4>📈 ZIG 转向指标</h4>
+                <div class="algo-controls-sidebar">
+                    <div class="algo-group">
+                        <input type="checkbox" id="shortTermZigCheck" checked>
+                        <label for="shortTermZigCheck">短期趋势 (5日均线, %):</label>
+                        <input type="number" id="shortTermZigInput" value="10" step="1">
+                    </div>
+                    <div class="algo-group">
+                        <input type="checkbox" id="mediumTermZigCheck" checked>
+                        <label for="mediumTermZigCheck">中期趋势 (25日均线, %):</label>
+                        <input type="number" id="mediumTermZigInput" value="10" step="1">
+                    </div>
+                    <div class="algo-group">
+                        <input type="checkbox" id="longTermZigCheck" checked>
+                        <label for="longTermZigCheck">长期趋势 (50日均线, %):</label>
+                        <input type="number" id="longTermZigInput" value="25" step="1">
+                    </div>
+                    <div class="algo-group">
+                        <label for="zigPhaseSourceSelect">区间判断基准:</label>
+                        <select id="zigPhaseSourceSelect">
+                            <option value="zig50" selected>ZIG(50)</option>
+                            <option value="zig25">ZIG(25)</option>
+                            <option value="zig5">ZIG(5)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h4>📊 成交量 ZIG 转向指标</h4>
+                <div class="algo-controls-sidebar">
+                    <div class="algo-group">
+                        <input type="checkbox" id="volumeShortTermZigCheck" checked>
+                        <label for="volumeShortTermZigCheck">短期趋势 (5日均线, %):</label>
+                        <input type="number" id="volumeShortTermZigInput" value="10" step="1">
+                    </div>
+                    <div class="algo-group">
+                        <input type="checkbox" id="volumeMediumTermZigCheck" checked>
+                        <label for="volumeMediumTermZigCheck">中期趋势 (25日均线, %):</label>
+                        <input type="number" id="volumeMediumTermZigInput" value="10" step="1">
+                    </div>
+                    <div class="algo-group">
+                        <input type="checkbox" id="volumeLongTermZigCheck" checked>
+                        <label for="volumeLongTermZigCheck">长期趋势 (50日均线, %):</label>
+                        <input type="number" id="volumeLongTermZigInput" value="10" step="1">
+                    </div>
+                    <div class="algo-group">
+                        <label for="volumeZigPhaseSourceSelect">区间判断基准:</label>
+                        <select id="volumeZigPhaseSourceSelect">
+                            <option value="volume_zig50" selected>ZIG(50)</option>
+                            <option value="volume_zig25">ZIG(25)</option>
+                            <option value="volume_zig5">ZIG(5)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h4>📱 显示模式设置</h4>
+                <div class="debug-controls-sidebar">
+                    <div class="debug-group">
+                        <label>小图标显示阈值:</label>
+                        <input type="range" id="timeSpanThresholdSlider" min="1" max="1095" value="1" step="1">
+                        <span id="timeSpanThresholdValue">1天</span>
+                    </div>
+                    <div class="debug-group" style="font-size: 12px; color: #6c757d; margin-top: 5px;">
+                        超过设定天数的时间跨度将显示小圆点，否则显示完整注释框
+                    </div>
+                    <div class="debug-group">
+                        <label>注释内容完善阈值:</label>
+                        <input type="range" id="contentThresholdSlider" min="1" max="100" value="30" step="1">
+                        <span id="contentThresholdValue">30字符</span>
+                    </div>
+                    <div class="debug-group" style="font-size: 12px; color: #6c757d; margin-top: 5px;">
+                        注释内容少于此字符数时隐藏中间背景，提示内容需要完善
+                    </div>
+                    <div class="debug-group">
+                        <label>键盘缩放比例:</label>
+                        <input type="range" id="zoomStepSlider" min="2" max="20" value="10" step="1">
+                        <span id="zoomStepValue">10%</span>
+                    </div>
+                    <div class="debug-group" style="font-size: 12px; color: #6c757d; margin-top: 5px;">
+                        使用方向键↑↓时每次缩放的幅度
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h4>🎨 样式调试参数</h4>
+                <div class="debug-controls-sidebar">
+                    <div class="debug-group">
+                        <label>注释框背景色:</label>
+                        <input type="color" id="bgColorPicker" value="#f0e68c">
+                    </div>
+                    <div class="debug-group">
+                        <label>文字颜色:</label>
+                        <input type="color" id="textColorPicker" value="#000000">
+                    </div>
+                    <div class="debug-group">
+                        <label>文字大小:</label>
+                        <input type="range" id="fontSizeSlider" min="10" max="20" value="13">
+                        <span id="fontSizeValue">13px</span>
+                    </div>
+                    <div class="debug-group">
+                        <label>注释按钮大小:</label>
+                        <input type="range" id="buttonSizeSlider" min="8" max="16" value="10" step="1">
+                        <span id="buttonSizeValue">10px</span>
+                    </div>
+                    <div class="debug-group">
+                        <label>线条颜色:</label>
+                        <input type="color" id="lineColorPicker" value="#000000">
+                    </div>
+                    <div class="debug-group">
+                        <label>透明度:</label>
+                        <input type="range" id="opacitySlider" min="0.3" max="1" step="0.1" value="0.8">
+                        <span id="opacityValue">0.8</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- V5.8: AI分析模式选择器 -->
+            <div class="sidebar-section">
+                <h4>🤖 AI分析模式</h4>
+                <div class="ai-mode-controls">
+                    <div class="ai-mode-group">
+                        <input type="radio" id="ai-mode-flash" name="ai-mode" value="flash">
+                        <label for="ai-mode-flash">⚡ Flash模式 (极速并发150)</label>
+                        <div class="ai-mode-desc">追求极致速度，适合大批量快速分析</div>
+                    </div>
+                    <div class="ai-mode-group">
+                        <input type="radio" id="ai-mode-pro" name="ai-mode" value="pro" checked>
+                        <label for="ai-mode-pro">🎯 Pro模式 (平衡并发10)</label>
+                        <div class="ai-mode-desc">速度与质量平衡，默认推荐模式</div>
+                    </div>
+                    <div class="ai-mode-group">
+                        <input type="radio" id="ai-mode-ultra" name="ai-mode" value="ultra">
+                        <label for="ai-mode-ultra">🔬 Ultra模式 (深度并发60)</label>
+                        <div class="ai-mode-desc">最深度分析，适合重要异动事件</div>
+                    </div>
+                </div>
+                <div class="ai-mode-note" style="font-size: 12px; color: #6c757d; margin-top: 10px;">
+                    ⚠️ 模式选择仅在当前会话有效，页面刷新后将重置为Pro模式
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="addAnnotationDialog" class="add-annotation-dialog" style="display: none;">
+        <div class="add-annotation-content">
+            <h3>新增注释</h3>
+            <div class="add-form-group">
+                <label for="addAnnotationDateInput">日期 (YYYY-MM-DD):</label>
+                <input type="date" id="addAnnotationDateInput" placeholder="例如: 2023-10-27">
+            </div>
+            <div class="add-form-group">
+                <label for="addAnnotationTextInput">注释内容:</label>
+                <textarea id="addAnnotationTextInput" rows="4"></textarea>
+            </div>
+            <div class="add-dialog-buttons">
+                <button id="cancelAddAnnotationBtn">取消</button>
+                <button id="saveAddAnnotationBtn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="editAnnotationDialog" class="add-annotation-dialog" style="display: none;">
+        <div class="add-annotation-content">
+            <h3>编辑注释</h3>
+            <div class="add-form-group">
+                <label for="editAnnotationDateInput">日期 (YYYY-MM-DD):</label>
+                <input type="date" id="editAnnotationDateInput" placeholder="例如: 2023-10-27">
+            </div>
+            <div class="add-form-group">
+                <label for="editAnnotationTextInput">注释内容:</label>
+                <textarea id="editAnnotationTextInput" rows="4"></textarea>
+            </div>
+            <div class="add-dialog-buttons">
+                <button id="cancelEditAnnotationBtn">取消</button>
+                <button id="saveEditAnnotationBtn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="exportAnnotationDialog" class="add-annotation-dialog" style="display: none;">
+        <div class="add-annotation-content">
+            <h3>📤 导出标注数据</h3>
+            <div class="add-form-group">
+                <label for="exportStartDateInput">开始日期:</label>
+                <input type="date" id="exportStartDateInput">
+            </div>
+            <div class="add-form-group">
+                <label for="exportEndDateInput">结束日期:</label>
+                <input type="date" id="exportEndDateInput">
+            </div>
+            <div class="export-info">
+                <p style="font-size: 14px; color: #6c757d; margin-bottom: 15px;">
+                    将导出选定时间段内的所有标注数据（包括算法生成的异常标注和手动添加的注释），数据将复制到剪贴板中。
+                </p>
+            </div>
+            <div class="add-dialog-buttons">
+                <button id="cancelExportAnnotationBtn">取消</button>
+                <button id="confirmExportAnnotationBtn">导出数据</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 使用说明弹窗 -->
+    <div id="helpDialog" class="help-dialog" style="display: none;">
+        <div class="help-dialog-content">
+            <div class="help-dialog-header">
+                <h3>📖 使用说明</h3>
+                <button id="closeHelpBtn" class="help-close-btn">×</button>
+            </div>
+            <div class="help-dialog-body">
+                <textarea id="helpTextArea" class="help-textarea" placeholder="在此编辑系统使用说明...">
+📈 股价异动分析系统使用指南
+
+🔍 **基本功能**
+• 输入股票代码（如：600000、AAPL、0700）或公司简称
+• 支持A股、美股、港股多市场数据分析
+• 提供日K、周K、月K线三种时间周期
+
+📊 **图表分析**
+• K线图表支持缩放和拖拽查看
+• 自动标注异常波动点（价量齐升/跌等）
+• 多条移动均线辅助分析趋势
+
+📝 **注释管理**
+• 双击异常点可查看详细分析
+• 支持手动添加、编辑注释
+• AI智能分析异动原因
+• 注释可导出为文本格式
+
+⚙️ **个性化设置**
+• 调整显示样式和颜色
+• 配置异常检测灵敏度
+• 自定义注释显示模式
+
+💡 **使用技巧**
+• 使用键盘方向键快速浏览
+• Ctrl+滚轮缩放图表
+• 右键注释获取更多选项
+                </textarea>
+            </div>
+            <div class="help-dialog-buttons">
+                <button id="resetHelpBtn" class="help-reset-btn">重置为默认</button>
+                <button id="saveHelpBtn" class="help-save-btn">保存说明</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.3.3/dist/echarts.min.js"></script>
+    <script src="static/script.js?v=20250824-9"></script>
+</body>
+</html> 

@@ -1,0 +1,6 @@
+Flask
+requests
+pandas
+numpy
+gunicorn
+psycopg2-binary

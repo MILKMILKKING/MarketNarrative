@@ -25,14 +25,6 @@
 
 ---
 
-<img width="1501" height="731" alt="image" src="https://github.com/user-attachments/assets/e6dd0ddf-c57e-44c5-8434-939df7fae98e" />
-
-<img width="1205" height="737" alt="image" src="https://github.com/user-attachments/assets/ba2f0221-5952-4250-92fe-6ff1b762ab27" />
-
-<img width="1431" height="729" alt="image" src="https://github.com/user-attachments/assets/ff90a158-a083-4430-bbab-964d4576234b" />
-
-
-
 ## 💡 我是如何解决的？
 
 ### 1. 自适应异常检测：从"固定阈值"到"动态基线"
@@ -94,6 +86,14 @@ threshold = mean + 2 * std_dev  # 每只股票独立计算
 - 返回结构化的买卖信号解读（而非"预测"）
 
 ---
+
+
+<img width="1501" height="731" alt="image" src="https://github.com/user-attachments/assets/e6dd0ddf-c57e-44c5-8434-939df7fae98e" />
+
+<img width="1205" height="737" alt="image" src="https://github.com/user-attachments/assets/ba2f0221-5952-4250-92fe-6ff1b762ab27" />
+
+<img width="1431" height="729" alt="image" src="https://github.com/user-attachments/assets/ff90a158-a083-4430-bbab-964d4576234b" />
+
 
 ## 🏗️ 技术架构
 
